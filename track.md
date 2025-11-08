@@ -21,7 +21,7 @@
     </style>
 </head>
 <body>
-    <canvas id="trackCanvas" width="800" height="600"></canvas>
+    <canvas id="trackCanvas" width="700" height="600"></canvas>
 
     <script>
         const canvas = document.getElementById('trackCanvas');
