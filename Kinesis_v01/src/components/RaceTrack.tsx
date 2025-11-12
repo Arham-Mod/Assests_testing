@@ -39,44 +39,51 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   };
 
   const drawOvalTrack = (ctx: CanvasRenderingContext2D, config: any) => {
-    const { centerX, centerY, radiusX, radiusY, trackWidth } = config;
+  const { radiusX, radiusY, trackWidth } = config;
 
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, width, height);
+  // Background
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(-width / 2, -height / 2, width, height); // because origin is now centered
 
-    ctx.strokeStyle = '#4a4a4a';
-    ctx.lineWidth = trackWidth;
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.stroke();
+  // Outer track
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = trackWidth;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.stroke();
 
-    ctx.strokeStyle = '#2d2d2d';
-    ctx.lineWidth = trackWidth - 8;
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.stroke();
+  // Inner track
+  ctx.strokeStyle = '#2d2d2d';
+  ctx.lineWidth = trackWidth - 8;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.stroke();
 
-    ctx.strokeStyle = '#ffd700';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([20, 15]);
-    ctx.beginPath();
-    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.setLineDash([]);
+  // Center dashed line
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([20, 15]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
 
-    const startX = centerX + radiusX - 50;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(startX, centerY - 45);
-    ctx.lineTo(startX, centerY + 45);
-    ctx.stroke();
+  // Start line
+  const startX = radiusX - 50;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(startX, -45);
+  ctx.lineTo(startX, 45);
+  ctx.stroke();
 
-    for (let i = 0; i < 6; i++) {
-      ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#000000';
-      ctx.fillRect(startX - 8, centerY - 45 + i * 15, 16, 15);
-    }
-  };
+  // Checker pattern
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#000000';
+    ctx.fillRect(startX - 8, -45 + i * 15, 16, 15);
+  }
+};
+
 
   const drawCircuitTrack = (ctx: CanvasRenderingContext2D, config: any) => {
     const { waypoints, trackWidth } = config;
@@ -127,20 +134,30 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  const canvas = canvasRef.current;
+  if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-    const config = trackConfigs[trackType];
+  // Clear canvas first
+  ctx.clearRect(0, 0, width, height);
 
-    if (config.type === 'ellipse') {
-      drawOvalTrack(ctx, config);
-    } else if (config.type === 'path') {
-      drawCircuitTrack(ctx, config);
-    }
-  }, [trackType, width, height]);
+  // 💡 Move origin to the center of the canvas
+  ctx.save();
+  ctx.translate(width / 2, height / 2);
+
+  const config = trackConfigs[trackType];
+
+  if (config.type === 'ellipse') {
+    drawOvalTrack(ctx, config);
+  } else if (config.type === 'path') {
+    drawCircuitTrack(ctx, config);
+  }
+
+  ctx.restore(); // Restore original coordinate system (optional)
+}, [trackType, width, height]);
+
 
   return (
     <canvas
