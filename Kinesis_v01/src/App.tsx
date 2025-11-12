@@ -1,25 +1,45 @@
+import './index.css';
 import RaceTrack from './components/RaceTrack';
-import AnimatedList from './components/AnimatedList';
+import LeaderboardPanel, { Agent } from './components/leaderboard';
 
-const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', 'Item 9', 'Item 10'];
+const drivers: Agent[] = [
+  { id: 1, name: 'Lewis Hamilton', country: 'GBR', points: 296, team: 'Mercedes' },
+  { id: 2, name: 'Valtteri Bottas', country: 'FIN', points: 231, team: 'Mercedes' },
+  { id: 3, name: 'Charles Leclerc', country: 'MON', points: 200, team: 'Ferrari' },
+];
+
+const teams = [
+  { id: 'mec', name: 'Mercedes', points: 527 },
+  { id: 'fer', name: 'Ferrari', points: 394 },
+];
 
 function App() {
   console.log('App rendering');
-  
+
   return (
-    <div style={{ padding: '20px', background: '#f0f0f0', minHeight: '100vh' }}>
+    <div
+      style={{
+        background: '#0a0a0a',
+        color: '#fff',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'flex-start',
+        gap: '40px',
+        padding: '40px',
+      }}
+    >
       
-      <RaceTrack trackType="oval" width={800} height={600} />
-      
-      <div className={""}>
-        <h2>Animated List:</h2>
-        <AnimatedList
-          items={items}
-          onItemSelect={(item, index) => console.log(item, index)}
-          showGradients={true}
-          enableArrowNavigation={true}
-          displayScrollbar={true}
-        />
+      {/* Race Track on Left */}
+      <div style={{ flex: 2, display: 'flex', justifyContent: 'center' }}>
+        
+        <RaceTrack trackType="oval" width={1000} height={800} />
+      </div>
+
+      {/* Leaderboard on Right */}
+      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+        <LeaderboardPanel drivers={drivers} teams={teams} />
       </div>
     </div>
   );
