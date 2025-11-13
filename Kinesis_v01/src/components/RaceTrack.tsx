@@ -3,47 +3,51 @@ import React, { useEffect, useRef } from 'react';
 interface RaceTrackProps {
   width?: number;
   height?: number;
-  trackType?: 'oval' | 'circuit';
+  trackType?: 'oval' | 'circuit' | 'stadium';
 }
 
 const RaceTrack: React.FC<RaceTrackProps> = ({ 
   width = 800, 
   height = 600, 
-  trackType = 'oval' 
+  trackType = 'stadium' 
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const trackConfigs = {
-    oval: {
-      type: 'ellipse',
-      centerX: 400,
-      centerY: 300,
-      radiusX: 300,
-      radiusY: 200,
-      trackWidth: 80
-    },
-    circuit: {
-      type: 'path',
-      waypoints: [
-        { x: 150, y: 300 },
-        { x: 150, y: 150 },
-        { x: 350, y: 100 },
-        { x: 550, y: 150 },
-        { x: 650, y: 300 },
-        { x: 650, y: 450 },
-        { x: 450, y: 500 },
-        { x: 250, y: 450 }
-      ],
-      trackWidth: 100
-    }
-  };
+  oval: {
+    type: 'ellipse',
+    radiusX: 300,
+    radiusY: 200,
+    trackWidth: 80
+  },
+  stadium: {
+    type: 'stadium',
+    straightLength: 400,
+    radius: 100,
+    trackWidth: 80
+  },
+  circuit: {
+    type: 'path',
+    waypoints: [
+      { x: -250, y: 0 },
+      { x: -250, y: -150 },
+      { x: -50, y: -200 },
+      { x: 150, y: -150 },
+      { x: 250, y: 0 },
+      { x: 250, y: 150 },
+      { x: 50, y: 200 },
+      { x: -150, y: 150 }
+    ],
+    trackWidth: 100
+  }
+};
 
   const drawOvalTrack = (ctx: CanvasRenderingContext2D, config: any) => {
   const { radiusX, radiusY, trackWidth } = config;
 
   // Background
   ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(-width / 2, -height / 2, width, height); // because origin is now centered
+  ctx.fillRect(-width / 2, -height / 2, width, height);
 
   // Outer track
   ctx.strokeStyle = '#4a4a4a';
@@ -78,6 +82,70 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   ctx.stroke();
 
   // Checker pattern
+  for (let i = 0; i < 6; i++) {
+    ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#000000';
+    ctx.fillRect(startX - 8, -45 + i * 15, 16, 15);
+  }
+};
+
+const drawStadiumTrack = (ctx: CanvasRenderingContext2D, config: any) => {
+  const { straightLength, radius, trackWidth } = config;
+
+  // Background
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(-width / 2, -height / 2, width, height);
+
+  // Helper function to draw rounded rectangle path
+  const drawStadiumPath = (halfLength: number, rad: number) => {
+    ctx.beginPath();
+    
+    // Right semicircle
+    ctx.arc(halfLength, 0, rad, -Math.PI / 2, Math.PI / 2);
+    
+    // Bottom straight line
+    ctx.lineTo(-halfLength, rad);
+    
+    // Left semicircle
+    ctx.arc(-halfLength, 0, rad, Math.PI / 2, -Math.PI / 2);
+    
+    // Top straight line
+    ctx.lineTo(halfLength, -rad);
+    
+    ctx.closePath();
+  };
+
+  const halfLength = straightLength / 2;
+
+  // Draw outer edge
+  ctx.strokeStyle = '#4a4a4a';
+  ctx.lineWidth = trackWidth;
+  drawStadiumPath(halfLength, radius);
+  ctx.stroke();
+
+  // Draw track surface
+  ctx.strokeStyle = '#2d2d2d';
+  ctx.lineWidth = trackWidth - 8;
+  drawStadiumPath(halfLength, radius);
+  ctx.stroke();
+
+  // Draw center dashed line
+  ctx.strokeStyle = '#ffd700';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([20, 15]);
+  drawStadiumPath(halfLength, radius);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw start/finish line
+  const startX = halfLength - 50;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(startX, -45);
+  ctx.lineTo(startX, 45);
+  ctx.stroke();
+
+  // Checkered pattern
   for (let i = 0; i < 6; i++) {
     ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#000000';
     ctx.fillRect(startX - 8, -45 + i * 15, 16, 15);
@@ -150,10 +218,12 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   const config = trackConfigs[trackType];
 
   if (config.type === 'ellipse') {
-    drawOvalTrack(ctx, config);
-  } else if (config.type === 'path') {
-    drawCircuitTrack(ctx, config);
-  }
+  drawOvalTrack(ctx, config);
+} else if (config.type === 'stadium') {
+  drawStadiumTrack(ctx, config);
+} else if (config.type === 'path') {
+  drawCircuitTrack(ctx, config);
+}
 
   ctx.restore(); // Restore original coordinate system (optional)
 }, [trackType, width, height]);

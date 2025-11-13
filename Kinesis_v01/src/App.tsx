@@ -32,10 +32,9 @@ function App() {
     >
       
       {/* Race Track on Left */}
-      <div style={{ flex: 2, display: 'flex', justifyContent: 'center' }}>
-        
-        <RaceTrack trackType="oval" width={1000} height={800} />
-      </div>
+      <div style={{ padding: '20px', background: '#0a0a0a', minHeight: '100vh' }}>
+      <RaceTrack trackType="stadium" width={1000} height={700} />
+    </div>
 
       {/* Leaderboard on Right */}
       <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
