@@ -1,45 +1,93 @@
-import './index.css';
+import { useState } from 'react';
 import RaceTrack from './components/RaceTrack';
-import LeaderboardPanel, { Agent } from './components/leaderboard';
+import ObstacleToolbar from './components/ObstacleToolbar';
 
-const drivers: Agent[] = [
-  { id: 1, name: 'Lewis Hamilton', country: 'GBR', points: 296, team: 'Mercedes' },
-  { id: 2, name: 'Valtteri Bottas', country: 'FIN', points: 231, team: 'Mercedes' },
-  { id: 3, name: 'Charles Leclerc', country: 'MON', points: 200, team: 'Ferrari' },
-];
-
-const teams = [
-  { id: 'mec', name: 'Mercedes', points: 527 },
-  { id: 'fer', name: 'Ferrari', points: 394 },
-];
+interface Obstacle {
+  id: number;
+  x: number;
+  y: number;
+  angle: number;
+  length: number;
+}
 
 function App() {
-  console.log('App rendering');
+  const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [isDraggingFromToolbar, setIsDraggingFromToolbar] = useState(false);
+
+  const handleObstaclesChange = (newObstacles: Obstacle[]) => {
+    setObstacles(newObstacles);
+  };
+
+  const handleClearAll = () => {
+    setObstacles([]);
+  };
+
+  const handleExportData = () => {
+    const data = {
+      obstacles: obstacles.map(obs => ({
+        x: Math.round(obs.x),
+        y: Math.round(obs.y),
+        angle_degrees: Math.round((obs.angle * 180) / Math.PI),
+        angle_radians: obs.angle.toFixed(3),
+        length: obs.length
+      }))
+    };
+    
+    console.log('=== OBSTACLE DATA FOR BACKEND ===');
+    console.log(JSON.stringify(data, null, 2));
+    alert(`Exported ${obstacles.length} obstacles to console! Check F12 → Console`);
+  };
 
   return (
-    <div
-      style={{
-        background: '#0a0a0a',
-        color: '#fff',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        gap: '40px',
-        padding: '40px',
-      }}
-    >
-      
-      {/* Race Track on Left */}
-      <div style={{ padding: '20px', background: '#0a0a0a', minHeight: '100vh' }}>
-      <RaceTrack trackType="stadium" width={1000} height={700} />
-    </div>
+    <div style={{ 
+      padding: '20px', 
+      background: '#0a0a0a', 
+      minHeight: '100vh'
+    }}>
+      <ObstacleToolbar 
+        onDragStart={() => setIsDraggingFromToolbar(true)}
+      />
 
-      {/* Leaderboard on Right */}
-      <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-        <LeaderboardPanel drivers={drivers} teams={teams} />
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        <button
+          onClick={handleClearAll}
+          style={{
+            padding: '10px 20px',
+            background: '#cc0000',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Clear All
+        </button>
+
+        <button
+          onClick={handleExportData}
+          style={{
+            padding: '10px 20px',
+            background: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Export Data
+        </button>
       </div>
+
+      <RaceTrack
+        width={800}
+        height={600}
+        trackType="stadium"
+        obstacles={obstacles}
+        onObstaclesChange={handleObstaclesChange}
+        isDraggingFromToolbar={isDraggingFromToolbar}
+      />
     </div>
   );
 }
