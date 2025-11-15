@@ -3,9 +3,19 @@
   grid-template-columns: 3fr 1fr;
   height: 100vh;
   overflow: hidden;
+  gap: 20px;
+  padding: 20px;
 }
 
 .left-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden;
+}
+
+.canvas-container {
+  flex-shrink: 0;
 }
 
 .right-section {
@@ -13,4 +23,24 @@
   display: flex;
   align-items: flex-start;
   position: relative;
+  overflow-y: auto;
+}
+
+.cards-section {
+  display: flex;
+  flex-direction: row;
+  gap: 30px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding-top: 20px;
+  min-height: 300px;
+}
+
+.adjacent-cards-container {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 250px;
 }

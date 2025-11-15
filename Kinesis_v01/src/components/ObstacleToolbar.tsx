@@ -13,7 +13,7 @@ const ObstacleToolbar: React.FC<ObstacleToolbarProps> = ({ onDragStart }) => {
 
   return (
     <div style={{
-      padding: '15px',
+      padding: '10px',
       background: '#2a2a2a',
       borderRadius: '8px',
       marginBottom: '20px',
