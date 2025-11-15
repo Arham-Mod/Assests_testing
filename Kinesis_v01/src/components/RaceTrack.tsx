@@ -30,6 +30,21 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const wsRef = useRef<WebSocket | null>(null);
+  
+  // Agent data storage - stores agent positions and properties
+  interface AgentData {
+    x: number;
+    y: number;
+    direction: number;
+    speed: number;
+    lap: number;
+    fuel: number;
+    state: string;
+  }
+  const agentsRef = useRef<Record<number, AgentData>>({});
+  // State to trigger re-renders when agents update
+  const [agentUpdateTrigger, setAgentUpdateTrigger] = useState(0);
 
   const trackConfigs = {
     oval: {
@@ -350,7 +365,93 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
     }
   };
 
-  // Render loop
+  // Agent drawing function - draws a single agent on the canvas
+  const drawAgent = (
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    _id: number, // Agent ID (kept for potential future use like labels)
+    direction: number
+  ) => {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((direction * Math.PI) / 180);
+
+    ctx.fillStyle = "#00ffff";
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = "#00ffff";
+
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.lineTo(4, 4);
+    ctx.lineTo(-4, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  };
+
+  // Draw all agents from the agentsRef
+  const drawAgents = (ctx: CanvasRenderingContext2D) => {
+    Object.entries(agentsRef.current).forEach(([id, agent]) => {
+      drawAgent(ctx, agent.x, agent.y, parseInt(id), agent.direction);
+    });
+  };
+
+  // WebSocket connection and agent data handling
+  useEffect(() => {
+    // Initialize WebSocket connection
+    wsRef.current = new WebSocket('ws://localhost:8000/ws');
+
+    // Handle WebSocket messages - parse JSON and update agent data
+    wsRef.current.addEventListener('message', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        // Handle both single agent and array of agents
+        const updates = data.agents || (data.id ? [data] : []);
+        
+        // Update agent store with new positions and data
+        updates.forEach((a: any) => {
+          if (a.id !== undefined && a.position) {
+            agentsRef.current[a.id] = {
+              x: a.position.x,
+              y: a.position.y,
+              direction: a.direction || 0,
+              speed: a.speed || 0,
+              lap: a.lap || 0,
+              fuel: a.fuel || 100,
+              state: a.state || 'running'
+            };
+          }
+        });
+        
+        // Trigger a re-render by updating state
+        setAgentUpdateTrigger(prev => prev + 1);
+        console.log('Agent data updated:', agentsRef.current);
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    });
+
+    // Handle WebSocket errors
+    wsRef.current.addEventListener('error', (error) => {
+      console.error('WebSocket error:', error);
+    });
+
+    // Handle WebSocket close
+    wsRef.current.addEventListener('close', () => {
+      console.log('WebSocket connection closed');
+    });
+
+    // Cleanup: close WebSocket on unmount
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  // Main render loop - draws track, obstacles, and agents
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -358,11 +459,15 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Clear canvas
+    ctx.clearRect(0, 0, width, height);
+
+    // Translate to center for drawing
     ctx.save();
     ctx.translate(width / 2, height / 2);
 
+    // Draw track based on type
     const config = trackConfigs[trackType];
-
     if (config.type === 'ellipse') {
       drawOvalTrack(ctx, config);
     } else if (config.type === 'stadium') {
@@ -371,10 +476,16 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
       drawCircuitTrack(ctx, config);
     }
 
+    // Draw obstacles
     drawObstacles(ctx);
 
-    // Draw coordinate display
+    // Draw agents
+    drawAgents(ctx);
+
+    // Restore context
     ctx.restore();
+
+    // Draw coordinate display (in screen coordinates, not translated)
     ctx.fillStyle = '#00ff00';
     ctx.font = '12px monospace';
     ctx.fillText(`Mouse: (${Math.round(mousePos.x)}, ${Math.round(mousePos.y)})`, 10, 20);
@@ -390,8 +501,15 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
       }
     }
 
-  }, [trackType, width, height, obstacles, selectedObstacle, mousePos]);
+    // Display agent count
+    const agentCount = Object.keys(agentsRef.current).length;
+    if (agentCount > 0) {
+      ctx.fillText(`Agents: ${agentCount}`, 10, 60);
+    }
 
+  }, [trackType, width, height, obstacles, selectedObstacle, mousePos, agentUpdateTrigger]);
+
+  
   return (
     <canvas
       ref={canvasRef}

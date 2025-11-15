@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import RaceTrack from './components/RaceTrack';
 import ObstacleToolbar from './components/ObstacleToolbar';
+import CardStack from "./components/card-stack";
+import AnimatedList from './components/AnimatedList';
+
+
+const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', 'Item 9', 'Item 10','Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', 'Item 9', 'Item 10']; 
 
 interface Obstacle {
   id: number;
@@ -39,55 +44,28 @@ function App() {
   };
 
   return (
-    <div style={{ 
-      padding: '20px', 
-      background: '#0a0a0a', 
-      minHeight: '100vh'
-    }}>
-      <ObstacleToolbar 
-        onDragStart={() => setIsDraggingFromToolbar(true)}
-      />
-
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-        <button
-          onClick={handleClearAll}
-          style={{
-            padding: '10px 20px',
-            background: '#cc0000',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          Clear All
-        </button>
-
-        <button
-          onClick={handleExportData}
-          style={{
-            padding: '10px 20px',
-            background: '#4CAF50',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          Export Data
-        </button>
+    <div className="app-container">
+        <div className="left-section">
+        <RaceTrack
+          width={1400}
+          height={800}
+          trackType="stadium"
+          obstacles={obstacles}
+          onObstaclesChange={handleObstaclesChange}
+          isDraggingFromToolbar={isDraggingFromToolbar}
+        />
+        </div>
+        
+      <div className="right-section">
+      <AnimatedList
+        items={items}
+        onItemSelect={(item, index) => console.log(item, index)}
+        showGradients={true}
+        enableArrowNavigation={true}
+        displayScrollbar={true}
+        />
       </div>
-
-      <RaceTrack
-        width={800}
-        height={600}
-        trackType="stadium"
-        obstacles={obstacles}
-        onObstaclesChange={handleObstaclesChange}
-        isDraggingFromToolbar={isDraggingFromToolbar}
-      />
+        
     </div>
   );
 }
