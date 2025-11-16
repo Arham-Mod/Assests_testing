@@ -31,7 +31,8 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-
+  const wsRef = useRef<WebSocket | null>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const trackConfigs = {
     oval: {
       type: 'ellipse',
@@ -351,55 +352,89 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
     }
   };
 
+  const drawCircle = (ctx,x, y, r) => {
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'red';
+    ctx.fill();
+  }
+
+  const update = (ctx, obj) => {
+      // clear only the old region (with some padding)
+    ctx.clearRect(obj.prevX - 6, obj.prevY - 6, 12, 12);
+    drawCircle(ctx, obj.position.x, obj.position.y, 5);
+    obj.prevX = obj.position.x;
+    obj.prevY = obj.position.y;
+  }
   // Render loop
   // Render loop
 useEffect(() => {
   const canvas = canvasRef.current;
   if (!canvas) return;
 
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  ctxRef.current = canvas.getContext('2d');
+  if (!ctxRef.current) return;
 
   // Clear canvas first
-  ctx.clearRect(0, 0, width, height);
+  ctxRef.current.clearRect(0, 0, width, height);
 
   // Save state before any transforms
-  ctx.save();
+  ctxRef.current.save();
 
   // Move origin to CENTER of canvas
-  ctx.translate(width / 2, height / 2);
+  ctxRef.current.translate(width / 2, height / 2);
 
   // Now (0, 0) is at center, but we need to offset the track
   // so it stays in the same visual position
   
   // Draw track (it's already positioned for top-left origin)
   // So we need to shift it back by half canvas dimensions
-  ctx.save();
-  ctx.translate(-width / 2, -height / 2);
-  drawTrackSmoothed(ctx);
-  ctx.restore();
+  ctxRef.current.save();
+  ctxRef.current.translate(-width / 2, -height / 2);
+  drawTrackSmoothed(ctxRef.current);
+  ctxRef.current.restore();
 
   // Draw obstacles (these use centered coordinates)
-  drawObstacles(ctx);
+  drawObstacles(ctxRef.current);
 
   // Restore transform for UI elements
-  ctx.restore();
+  ctxRef.current.restore();
 
   // Draw coordinate display (in screen coordinates)
-  ctx.fillStyle = '#00ff00';
-  ctx.font = '12px monospace';
-  ctx.fillText(`Mouse: (${Math.round(mousePos.x)}, ${Math.round(mousePos.y)})`, 10, 20);
+  ctxRef.current.fillStyle = '#00ff00';
+  ctxRef.current.font = '12px monospace';
+  ctxRef.current.fillText(`Mouse: (${Math.round(mousePos.x)}, ${Math.round(mousePos.y)})`, 10, 20);
 
   if (selectedObstacle) {
     const obs = obstacles.find(o => o.id === selectedObstacle);
     if (obs) {
-      ctx.fillText(
+      ctxRef.current.fillText(
         `Selected: x=${Math.round(obs.x)}, y=${Math.round(obs.y)}, angle=${(obs.angle * 180 / Math.PI).toFixed(1)}°, length=${obs.length}`,
         10,
         40
       );
     }
   }
+
+  wsRef.current = new WebSocket('ws://localhost:8000/ws');
+  wsRef.current.onopen = () => {
+    console.log('WebSocket connection established');
+  };
+
+  let lastRender = performance.now();
+  wsRef.current.onmessage = (event) => {
+    const now = performance.now();
+
+    // Cap rendering at 20–30 FPS
+    if (now - lastRender < 33) return; // 33ms → 30 FPS
+
+    lastRender = now;
+
+    const data = JSON.parse(event.data);
+    data.forEach((obj) => {
+        update(ctxRef.current, obj);
+    });
+  };
 
 }, [trackType, width, height, obstacles, selectedObstacle, mousePos]);
 
