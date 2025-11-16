@@ -1,42 +1,32 @@
 import React, { useEffect, useRef, useState } from "react";
 
-/**
- * TrackTracer (final)
- *
- * - Multi-path tracing (outer + inner + more)
- * - Finish -> draw final track on canvas
- * - Export PNG
- * - EXPORT CANVAS CODE -> downloads `track-draw.js` which contains:
- *     drawTrackSmoothed(ctx) // recommended (uses smoothing)
- *     drawTrackRaw(ctx)      // uses raw points
- *
- * Usage:
- * <TrackTracer imgSrc="/track.png" canvasWidth={1200} canvasHeight={700} />
- */
-
 export default function TrackTracer({
   imgSrc,
-  canvasWidth = 1000,
-  canvasHeight = 600,
+  canvasWidth = 1200,
+  canvasHeight = 700,
 }) {
   const canvasRef = useRef(null);
   const imgRef = useRef(null);
 
-  const [paths, setPaths] = useState([[]]); // array of paths (each path = [{x,y},...])
+  const [paths, setPaths] = useState([[]]);
   const [activePath, setActivePath] = useState(0);
   const [isDrawing, setIsDrawing] = useState(true);
   const [mousePos, setMousePos] = useState(null);
   const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Visual params (tweakable)
-  const asphaltColor = "#2c2c2e";
-  const asphaltWidth = 36;
-  const curbWidth = 60;
-  const dash = 24;
-  const gap = 24;
-  const curbPattern = [dash, gap];
+  const [trackParams, setTrackParams] = useState({
+    asphaltColor: "#2c2c2e",
+    asphaltWidth: 24,
+    curbWidth: 36,
+    dashLength: 16,
+    gapLength: 16,
+    curbColorPrimary: "#ff3333",
+    curbColorSecondary: "#ffffff",
+    smoothness: 0.5,
+    smoothSegments: 16,
+  });
 
-  // Load PNG guide
+  // Load image
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = "anonymous";
@@ -44,151 +34,45 @@ export default function TrackTracer({
     img.onload = () => {
       imgRef.current = img;
       setImageLoaded(true);
-      redraw();
     };
     img.onerror = () => {
       console.warn("Failed to load:", imgSrc);
       imgRef.current = null;
       setImageLoaded(false);
-      redraw();
     };
   }, [imgSrc]);
 
   useEffect(() => {
     redraw();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paths, mousePos, imageLoaded, activePath]);
+  }, [paths, mousePos, imageLoaded, activePath, trackParams]);
 
   function getCtx() {
     const canvas = canvasRef.current;
-    if (!canvas) return null;
-    return canvas.getContext("2d");
+    return canvas?.getContext("2d");
   }
 
-  function redraw() {
-    const ctx = getCtx();
-    if (!ctx) return;
-    const canvas = canvasRef.current;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // guide image (faint)
-    if (imgRef.current) {
-      const img = imgRef.current;
-      const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const x = (canvas.width - w) / 2;
-      const y = (canvas.height - h) / 2;
-      ctx.globalAlpha = 0.55;
-      ctx.drawImage(img, x, y, w, h);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.fillStyle = "#0b0b0b";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    // draw every path (polyline) and points
-    for (let idx = 0; idx < paths.length; idx++) {
-      const path = paths[idx];
-      if (!path || path.length === 0) continue;
-
-      ctx.beginPath();
-      ctx.moveTo(path[0].x, path[0].y);
-      for (let i = 1; i < path.length; i++) ctx.lineTo(path[i].x, path[i].y);
-      ctx.strokeStyle = "rgba(255,255,255,0.95)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      // points
-      for (const p of path) {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = idx === activePath ? "yellow" : "white";
-        ctx.fill();
-      }
-    }
-
-    // preview for active path
-    const cur = paths[activePath] || [];
-    if (mousePos && isDrawing && cur.length > 0) {
-      const last = cur[cur.length - 1];
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(mousePos.x, mousePos.y);
-      ctx.strokeStyle = "rgba(255,255,255,0.45)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-  }
-
-  function handleClick(e) {
-    if (!isDrawing) return;
+  function getMousePos(e) {
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvasRef.current.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvasRef.current.height;
-
-    setPaths((prev) => {
-      const updated = prev.map((p) => p.slice());
-      updated[activePath] = [...(updated[activePath] || []), { x, y }];
-      return updated;
-    });
+    return {
+      x: ((e.clientX - rect.left) / rect.width) * canvasRef.current.width,
+      y: ((e.clientY - rect.top) / rect.height) * canvasRef.current.height,
+    };
   }
 
-  function handleMouseMove(e) {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * canvasRef.current.width;
-    const y = ((e.clientY - rect.top) / rect.height) * canvasRef.current.height;
-    setMousePos({ x, y });
-  }
-
-  function startNewPath() {
-    setPaths((prev) => {
-      const next = prev.map((p) => p.slice());
-      next.push([]);
-      return next;
-    });
-    setActivePath(paths.length); // will be previous length (next index)
-  }
-
-  function undoLast() {
-    if (!isDrawing) return;
-    setPaths((prev) => {
-      const next = prev.map((p) => p.slice());
-      if (!next[activePath] || next[activePath].length === 0) return next;
-      next[activePath].pop();
-      return next;
-    });
-  }
-
-  function clearAll() {
-    setPaths([[]]);
-    setActivePath(0);
-    setIsDrawing(true);
-    redraw();
-  }
-
-  function finishTracing() {
-    if (!paths.some((p) => p.length > 1)) {
-      alert("Trace at least one path with 2+ points.");
-      return;
-    }
-    setIsDrawing(false);
-    drawFinalTrack();
-  }
-
-  // smoothing function (Catmull-Rom like -> returns many points)
-  function getSmooth(points, tension = 0.5, segments = 12) {
+  function smoothPath(points, tension = 0.5, segments = 16) {
     if (!points || points.length < 2) return points.slice();
-    const out = [];
+    
+    const result = [];
     const pts = points.slice();
-    for (let i = -1; i < pts.length - 1; i++) {
-      const p0 = i < 0 ? pts[0] : pts[i];
-      const p1 = pts[i + 1];
-      const p2 = i + 2 < pts.length ? pts[i + 2] : p1;
-      const p3 = i + 3 < pts.length ? pts[i + 3] : p2;
+    
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = i > 0 ? pts[i - 1] : pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = i + 2 < pts.length ? pts[i + 2] : p2;
 
-      for (let t = 0; t <= segments; t++) {
+      for (let t = 0; t < segments; t++) {
         const tt = t / segments;
         const t2 = tt * tt;
         const t3 = t2 * tt;
@@ -198,220 +82,441 @@ export default function TrackTracer({
         const q3 = (tension - 2) * t3 + (3 - 2 * tension) * t2 + tension * tt;
         const q4 = tension * t3 - tension * t2;
 
-        const x = q1 * p0.x + q2 * p1.x + q3 * p2.x + q4 * p3.x;
-        const y = q1 * p0.y + q2 * p1.y + q3 * p2.y + q4 * p3.y;
-        out.push({ x, y });
+        result.push({
+          x: q1 * p0.x + q2 * p1.x + q3 * p2.x + q4 * p3.x,
+          y: q1 * p0.y + q2 * p1.y + q3 * p2.y + q4 * p3.y,
+        });
       }
     }
-    return out;
+    result.push(pts[pts.length - 1]);
+    return result;
   }
 
-  function drawPathWithCurbs(ctx, pointsArray) {
-    if (!pointsArray || pointsArray.length < 2) return;
-    const smooth = getSmooth(pointsArray);
+  function drawBackgroundImage(ctx) {
+    const canvas = canvasRef.current;
+    
+    if (imgRef.current) {
+      const img = imgRef.current;
+      const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+      const w = img.width * scale;
+      const h = img.height * scale;
+      const x = (canvas.width - w) / 2;
+      const y = (canvas.height - h) / 2;
+      
+      ctx.globalAlpha = 0.4;
+      ctx.drawImage(img, x, y, w, h);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = "#0a0a0a";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function drawPathPoints(ctx, path, isActive) {
+    if (!path || path.length === 0) return;
+
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x, path[i].y);
+    }
+    ctx.strokeStyle = isActive ? "rgba(255, 255, 100, 0.8)" : "rgba(200, 200, 200, 0.6)";
+    ctx.lineWidth = isActive ? 2.5 : 1.5;
+    ctx.stroke();
+
+    for (let i = 0; i < path.length; i++) {
+      const p = path[i];
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isActive ? 4 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = isActive ? "#ffff00" : "#ffffff";
+      ctx.fill();
+      
+      if (isActive) {
+        ctx.strokeStyle = "#ff8800";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
+
+  function drawTrackWithCurbs(ctx, points) {
+    if (!points || points.length < 2) return;
+    
+    const smooth = smoothPath(
+      points,
+      trackParams.smoothness,
+      trackParams.smoothSegments
+    );
 
     ctx.save();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
 
-    // red curbs
+    const curbPattern = [trackParams.dashLength, trackParams.gapLength];
+
     ctx.beginPath();
     ctx.moveTo(smooth[0].x, smooth[0].y);
-    for (let i = 1; i < smooth.length; i++) ctx.lineTo(smooth[i].x, smooth[i].y);
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = curbWidth;
+    smooth.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = trackParams.curbColorPrimary;
+    ctx.lineWidth = trackParams.curbWidth;
     ctx.setLineDash(curbPattern);
     ctx.lineDashOffset = 0;
     ctx.stroke();
 
-    // white curbs (offset)
     ctx.beginPath();
     ctx.moveTo(smooth[0].x, smooth[0].y);
-    for (let i = 1; i < smooth.length; i++) ctx.lineTo(smooth[i].x, smooth[i].y);
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = curbWidth;
+    smooth.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = trackParams.curbColorSecondary;
+    ctx.lineWidth = trackParams.curbWidth;
     ctx.setLineDash(curbPattern);
-    ctx.lineDashOffset = dash;
+    ctx.lineDashOffset = trackParams.dashLength;
     ctx.stroke();
 
-    // asphalt center
     ctx.beginPath();
     ctx.moveTo(smooth[0].x, smooth[0].y);
-    for (let i = 1; i < smooth.length; i++) ctx.lineTo(smooth[i].x, smooth[i].y);
-    ctx.strokeStyle = asphaltColor;
-    ctx.lineWidth = asphaltWidth;
+    smooth.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+    ctx.strokeStyle = trackParams.asphaltColor;
+    ctx.lineWidth = trackParams.asphaltWidth;
     ctx.setLineDash([]);
     ctx.stroke();
 
     ctx.restore();
   }
 
-  function drawFinalTrack() {
+  function redraw() {
     const ctx = getCtx();
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    
+    const canvas = canvasRef.current;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // optionally re-draw faint guide
-    if (imgRef.current) {
-      const img = imgRef.current;
-      const scale = Math.min(canvasRef.current.width / img.width, canvasRef.current.height / img.height);
-      const w = img.width * scale;
-      const h = img.height * scale;
-      const x = (canvasRef.current.width - w) / 2;
-      const y = (canvasRef.current.height - h) / 2;
-      ctx.globalAlpha = 0.55;
-      ctx.drawImage(img, x, y, w, h);
-      ctx.globalAlpha = 1;
+    drawBackgroundImage(ctx);
+
+    if (isDrawing) {
+      paths.forEach((path, idx) => {
+        drawPathPoints(ctx, path, idx === activePath);
+      });
+
+      const currentPath = paths[activePath];
+      if (mousePos && currentPath?.length > 0) {
+        const last = currentPath[currentPath.length - 1];
+        ctx.beginPath();
+        ctx.moveTo(last.x, last.y);
+        ctx.lineTo(mousePos.x, mousePos.y);
+        ctx.strokeStyle = "rgba(255, 255, 100, 0.4)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     } else {
-      ctx.fillStyle = "#0b0b0b";
-      ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-
-    // draw every path
-    for (const p of paths) {
-      if (p.length > 1) drawPathWithCurbs(ctx, p);
+      paths.forEach((path) => {
+        if (path.length > 1) drawTrackWithCurbs(ctx, path);
+      });
     }
   }
 
-  // Export canvas PNG
+  function handleClick(e) {
+    if (!isDrawing) return;
+    const pos = getMousePos(e);
+    
+    setPaths((prev) => {
+      const updated = [...prev];
+      updated[activePath] = [...(updated[activePath] || []), pos];
+      return updated;
+    });
+  }
+
+  function handleMouseMove(e) {
+    setMousePos(getMousePos(e));
+  }
+
+  function startNewPath() {
+    setPaths((prev) => [...prev, []]);
+    setActivePath(paths.length);
+  }
+
+  function switchPath(index) {
+    if (index >= 0 && index < paths.length) {
+      setActivePath(index);
+    }
+  }
+
+  function undoLast() {
+    if (!isDrawing) return;
+    setPaths((prev) => {
+      const updated = [...prev];
+      if (updated[activePath]?.length > 0) {
+        updated[activePath] = updated[activePath].slice(0, -1);
+      }
+      return updated;
+    });
+  }
+
+  function deletePath(index) {
+    if (!isDrawing) return;
+    setPaths((prev) => {
+      const updated = prev.filter((_, i) => i !== index);
+      if (updated.length === 0) updated.push([]);
+      return updated;
+    });
+    if (activePath >= paths.length - 1) {
+      setActivePath(Math.max(0, paths.length - 2));
+    }
+  }
+
+  function clearAll() {
+    setPaths([[]]);
+    setActivePath(0);
+    setIsDrawing(true);
+  }
+
+  function finishTracing() {
+    const validPaths = paths.filter((p) => p.length > 1);
+    if (validPaths.length === 0) {
+      alert("Please trace at least one path with 2+ points.");
+      return;
+    }
+    setIsDrawing(false);
+  }
+
+  function editAgain() {
+    setIsDrawing(true);
+  }
+
   function exportPNG() {
     const link = document.createElement("a");
-    link.download = "track.png";
+    link.download = `track_${Date.now()}.png`;
     link.href = canvasRef.current.toDataURL("image/png");
     link.click();
   }
 
-  // Build and download JS code that draws the track on any canvas context
+  function generateCanvasCode() {
+    const validPaths = paths.filter((p) => p.length > 1);
+    
+    function formatPoints(points) {
+      return points.map((p) => `{x:${p.x.toFixed(1)},y:${p.y.toFixed(1)}}`).join(",");
+    }
+
+    const rawPathsCode = validPaths.map((p) => `[${formatPoints(p)}]`).join(",\n  ");
+    const smoothPathsCode = validPaths
+      .map((p) => `[${formatPoints(smoothPath(p, trackParams.smoothness, trackParams.smoothSegments))}]`)
+      .join(",\n  ");
+
+    return `/**
+ * Track Drawing Code
+ * Generated: ${new Date().toISOString()}
+ */
+
+const CONFIG = {
+  asphaltColor: "${trackParams.asphaltColor}",
+  asphaltWidth: ${trackParams.asphaltWidth},
+  curbWidth: ${trackParams.curbWidth},
+  dashLength: ${trackParams.dashLength},
+  gapLength: ${trackParams.gapLength},
+  curbColorPrimary: "${trackParams.curbColorPrimary}",
+  curbColorSecondary: "${trackParams.curbColorSecondary}",
+};
+
+const RAW_PATHS = [
+  ${rawPathsCode}
+];
+
+const SMOOTH_PATHS = [
+  ${smoothPathsCode}
+];
+
+function _drawPath(ctx, points, config = CONFIG) {
+  if (!points || points.length < 2) return;
+  
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  const pattern = [config.dashLength, config.gapLength];
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = config.curbColorPrimary;
+  ctx.lineWidth = config.curbWidth;
+  ctx.setLineDash(pattern);
+  ctx.lineDashOffset = 0;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = config.curbColorSecondary;
+  ctx.lineWidth = config.curbWidth;
+  ctx.setLineDash(pattern);
+  ctx.lineDashOffset = config.dashLength;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  points.forEach((p, i) => i > 0 && ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = config.asphaltColor;
+  ctx.lineWidth = config.asphaltWidth;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+export function drawTrack(ctx, config) {
+  if (!ctx) throw new Error("Canvas context required");
+  const cfg = { ...CONFIG, ...config };
+  SMOOTH_PATHS.forEach(path => _drawPath(ctx, path, cfg));
+}
+
+export function drawTrackRaw(ctx, config) {
+  if (!ctx) throw new Error("Canvas context required");
+  const cfg = { ...CONFIG, ...config };
+  RAW_PATHS.forEach(path => _drawPath(ctx, path, cfg));
+}
+
+export default drawTrack;
+`;
+  }
+
   function exportCanvasCode() {
-    // We'll export both smoothed and raw variants
-    // Helper: convert a JS array of points into literal string
-    function pointsToLiteral(pointsArray) {
-      // Format numbers with fixed 2 decimals to keep code readable
-      const literals = pointsArray.map((p) => `{x:${p.x.toFixed(2)},y:${p.y.toFixed(2)}}`);
-      return `[${literals.join(",")}]`;
-    }
-
-    // Build arrays for raw and smoothed
-    const rawPaths = paths.map((p) => p.slice()); // copy
-    const smoothPaths = paths.map((p) => getSmooth(p));
-
-    // Build code string
-    let code = "";
-    code += "// track-draw.js — generated by TrackTracer\n";
-    code += "// Contains two functions: drawTrackSmoothed(ctx) and drawTrackRaw(ctx)\n";
-    code += "// Usage:\n";
-    code += "// 1) include this script or paste functions into your project\n";
-    code += "// 2) call drawTrackSmoothed(ctx) where ctx is a 2D canvas context\n\n";
-
-    // constants
-    code += "const _ASPHALT_COLOR = \"" + asphaltColor + "\";\n";
-    code += "const _ASPHALT_WIDTH = " + asphaltWidth + ";\n";
-    code += "const _CURB_WIDTH = " + curbWidth + ";\n";
-    code += "const _DASH = " + dash + ";\n";
-    code += "const _GAP = " + gap + ";\n\n";
-
-    // raw paths data
-    code += "// Raw paths (your clicked points)\n";
-    code += "const RAW_PATHS = [\n";
-    for (let i = 0; i < rawPaths.length; i++) {
-      code += "  " + pointsToLiteral(rawPaths[i]) + (i === rawPaths.length - 1 ? "\n" : ",\n");
-    }
-    code += "];\n\n";
-
-    // smoothed paths data
-    code += "// Smoothed paths (pre-calculated)\n";
-    code += "const SMOOTH_PATHS = [\n";
-    for (let i = 0; i < smoothPaths.length; i++) {
-      code += "  " + pointsToLiteral(smoothPaths[i]) + (i === smoothPaths.length - 1 ? "\n" : ",\n");
-    }
-    code += "];\n\n";
-
-    // helper drawing routine used in both functions
-    code += "function _drawPathWithCurbs(ctx, pts) {\n";
-    code += "  if (!pts || pts.length < 2) return;\n";
-    code += "  ctx.save();\n";
-    code += "  ctx.lineJoin = 'round';\n";
-    code += "  ctx.lineCap = 'round';\n\n";
-
-    code += "  // Red curbs\n";
-    code += "  ctx.beginPath();\n";
-    code += "  ctx.moveTo(pts[0].x, pts[0].y);\n";
-    code += "  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);\n";
-    code += "  ctx.strokeStyle = 'red';\n";
-    code += "  ctx.lineWidth = _CURB_WIDTH;\n";
-    code += "  ctx.setLineDash([_DASH, _GAP]);\n";
-    code += "  ctx.lineDashOffset = 0;\n";
-    code += "  ctx.stroke();\n\n";
-
-    code += "  // White curbs (offset)\n";
-    code += "  ctx.beginPath();\n";
-    code += "  ctx.moveTo(pts[0].x, pts[0].y);\n";
-    code += "  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);\n";
-    code += "  ctx.strokeStyle = 'white';\n";
-    code += "  ctx.lineWidth = _CURB_WIDTH;\n";
-    code += "  ctx.setLineDash([_DASH, _GAP]);\n";
-    code += "  ctx.lineDashOffset = _DASH;\n";
-    code += "  ctx.stroke();\n\n";
-
-    code += "  // Asphalt\n";
-    code += "  ctx.beginPath();\n";
-    code += "  ctx.moveTo(pts[0].x, pts[0].y);\n";
-    code += "  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);\n";
-    code += "  ctx.strokeStyle = _ASPHALT_COLOR;\n";
-    code += "  ctx.lineWidth = _ASPHALT_WIDTH;\n";
-    code += "  ctx.setLineDash([]);\n";
-    code += "  ctx.stroke();\n";
-    code += "  ctx.restore();\n";
-    code += "}\n\n";
-
-    // drawTrackSmoothed
-    code += "export function drawTrackSmoothed(ctx) {\n";
-    code += "  if (!ctx) throw new Error('ctx is required');\n";
-    code += "  for (let i = 0; i < SMOOTH_PATHS.length; i++) {\n";
-    code += "    _drawPathWithCurbs(ctx, SMOOTH_PATHS[i]);\n";
-    code += "  }\n";
-    code += "}\n\n";
-
-    // drawTrackRaw
-    code += "export function drawTrackRaw(ctx) {\n";
-    code += "  if (!ctx) throw new Error('ctx is required');\n";
-    code += "  for (let i = 0; i < RAW_PATHS.length; i++) {\n";
-    code += "    _drawPathWithCurbs(ctx, RAW_PATHS[i]);\n";
-    code += "  }\n";
-    code += "}\n\n";
-
-    // Also add a convenience default export that draws smoothed
-    code += "export default drawTrackSmoothed;\n";
-
-    // download file
+    const code = generateCanvasCode();
     const blob = new Blob([code], { type: "application/javascript;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "track-draw.js";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `track-draw_${Date.now()}.js`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
     URL.revokeObjectURL(url);
   }
 
+  function updateTrackParam(key, value) {
+    setTrackParams({ ...trackParams, [key]: value });
+  }
+
   return (
-    <div style={{ userSelect: "none" }}>
-      <div style={{ marginBottom: 10 }}>
-        <button onClick={undoLast} disabled={!isDrawing}>
-          Undo
-        </button>{" "}
-        <button onClick={startNewPath} disabled={!isDrawing}>
-          Start New Path
-        </button>{" "}
-        <button onClick={clearAll}>Clear</button>{" "}
-        <button onClick={finishTracing} disabled={!isDrawing}>
-          Finish
-        </button>{" "}
-        <button onClick={exportPNG}>Export PNG</button>{" "}
-        <button onClick={exportCanvasCode} disabled={isDrawing}>
-          Export Canvas Code
-        </button>
+    <div style={styles.container}>
+      <div style={styles.controlsPanel}>
+        <div style={styles.buttonGroup}>
+          <button onClick={undoLast} disabled={!isDrawing} style={styles.button}>
+            ↶ Undo
+          </button>
+          <button onClick={startNewPath} disabled={!isDrawing} style={styles.button}>
+            ➕ New Path
+          </button>
+          <button onClick={clearAll} style={styles.button}>
+            🗑️ Clear All
+          </button>
+          <button
+            onClick={isDrawing ? finishTracing : editAgain}
+            style={{ ...styles.button, ...styles.primaryButton }}
+          >
+            {isDrawing ? "✓ Finish" : "✎ Edit"}
+          </button>
+        </div>
+
+        {isDrawing && paths.length > 1 && (
+          <div style={styles.pathSelector}>
+            <span style={styles.label}>Active Path:</span>
+            {paths.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => switchPath(idx)}
+                style={{
+                  ...styles.pathButton,
+                  ...(idx === activePath ? styles.pathButtonActive : {}),
+                }}
+              >
+                {idx + 1} ({paths[idx].length})
+                {paths.length > 1 && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deletePath(idx);
+                    }}
+                    style={styles.deleteBtn}
+                  >
+                    ✕
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={styles.parametersSection}>
+          <h3 style={styles.sectionTitle}>⚙️ Track Settings</h3>
+          
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>
+              Asphalt Width: {trackParams.asphaltWidth}px
+            </label>
+            <input
+              type="range"
+              min="8"
+              max="60"
+              value={trackParams.asphaltWidth}
+              onChange={(e) => updateTrackParam("asphaltWidth", Number(e.target.value))}
+              style={styles.slider}
+            />
+          </div>
+
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>
+              Curb Width: {trackParams.curbWidth}px
+            </label>
+            <input
+              type="range"
+              min="16"
+              max="100"
+              value={trackParams.curbWidth}
+              onChange={(e) => updateTrackParam("curbWidth", Number(e.target.value))}
+              style={styles.slider}
+            />
+          </div>
+
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>
+              Dash Length: {trackParams.dashLength}px
+            </label>
+            <input
+              type="range"
+              min="4"
+              max="40"
+              value={trackParams.dashLength}
+              onChange={(e) => updateTrackParam("dashLength", Number(e.target.value))}
+              style={styles.slider}
+            />
+          </div>
+
+          <div style={styles.sliderGroup}>
+            <label style={styles.sliderLabel}>
+              Smoothness: {trackParams.smoothSegments}
+            </label>
+            <input
+              type="range"
+              min="8"
+              max="32"
+              value={trackParams.smoothSegments}
+              onChange={(e) => updateTrackParam("smoothSegments", Number(e.target.value))}
+              style={styles.slider}
+            />
+          </div>
+        </div>
+
+        {!isDrawing && (
+          <div style={styles.buttonGroup}>
+            <button onClick={exportPNG} style={{ ...styles.button, ...styles.exportButton }}>
+              📥 Export PNG
+            </button>
+            <button onClick={exportCanvasCode} style={{ ...styles.button, ...styles.exportButton }}>
+              💾 Export Canvas Code
+            </button>
+          </div>
+        )}
       </div>
 
       <canvas
@@ -419,21 +524,137 @@ export default function TrackTracer({
         width={canvasWidth}
         height={canvasHeight}
         style={{
-          border: "1px solid gray",
-          width: canvasWidth,
-          height: canvasHeight,
+          border: "2px solid #ddd",
+          borderRadius: "10px",
+          width: "100%",
+          height: "auto",
           cursor: isDrawing ? "crosshair" : "default",
           display: "block",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
         }}
         onClick={handleClick}
         onMouseMove={handleMouseMove}
       />
 
-      <p style={{ color: "white", marginTop: 10 }}>
-        Click to add points. Use <b>Start New Path</b> to switch outlines (outer → inner). Click{" "}
-        <b>Finish</b> to render final track, then click <b>Export Canvas Code</b> to download a JS
-        file you can paste anywhere.
+      <p style={styles.helpText}>
+        {isDrawing ? (
+          <>
+            Click to add points. Use <strong>New Path</strong> for inner boundaries. 
+            Click <strong>Finish</strong> when done.
+          </>
+        ) : (
+          <>
+            Track rendered! Click <strong>Edit</strong> to modify or <strong>Export</strong> to save.
+          </>
+        )}
       </p>
     </div>
   );
 }
+const styles = {
+  container: {
+    userSelect: "none",
+  },
+  controlsPanel: {
+    background: "#f8f9fa",
+    padding: "20px",
+    borderRadius: "12px",
+    marginBottom: "20px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+  },
+  buttonGroup: {
+    display: "flex",
+    gap: "10px",
+    marginBottom: "15px",
+    flexWrap: "wrap",
+  },
+  button: {
+    padding: "10px 20px",
+    background: "#6c757d",
+    color: "white",
+    border: "none",
+    borderRadius: "8px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+    transition: "all 0.2s",
+  },
+  primaryButton: {
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+  },
+  exportButton: {
+    background: "linear-gradient(135deg, #11998e 0%, #38ef7d 100%)",
+  },
+  pathSelector: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    marginBottom: "15px",
+    padding: "15px",
+    background: "white",
+    borderRadius: "8px",
+    flexWrap: "wrap",
+  },
+  label: {
+    fontWeight: "600",
+    color: "#333",
+  },
+  pathButton: {
+    padding: "8px 16px",
+    background: "#e9ecef",
+    color: "#495057",
+    border: "2px solid transparent",
+    borderRadius: "6px",
+    cursor: "pointer",
+    fontSize: "13px",
+    fontWeight: "600",
+    transition: "all 0.2s",
+  },
+  pathButtonActive: {
+    background: "#667eea",
+    color: "white",
+    borderColor: "#764ba2",
+  },
+  deleteBtn: {
+    marginLeft: "8px",
+    color: "#dc3545",
+    fontWeight: "bold",
+  },
+  parametersSection: {
+    padding: "15px",
+    background: "white",
+    borderRadius: "8px",
+    marginBottom: "15px",
+  },
+  sectionTitle: {
+    fontSize: "16px",
+    fontWeight: "700",
+    color: "#333",
+    marginBottom: "15px",
+  },
+  sliderGroup: {
+    marginBottom: "15px",
+  },
+  sliderLabel: {
+    display: "block",
+    fontSize: "14px",
+    color: "#495057",
+    fontWeight: "600",
+    marginBottom: "8px",
+  },
+  slider: {
+    width: "100%",
+    height: "6px",
+    borderRadius: "3px",
+    outline: "none",
+  },
+  helpText: {
+    marginTop: "15px",
+    padding: "12px",
+    background: "#e7f3ff",
+    borderLeft: "4px solid #667eea",
+    borderRadius: "6px",
+    color: "#333",
+    fontSize: "14px",
+  },
+};

@@ -1,5 +1,4 @@
-
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import RaceTrack from './components/RaceTrack';
 import ObstacleToolbar from './components/ObstacleToolbar';
 import AnimatedList from './components/AnimatedList';
@@ -15,9 +14,7 @@ import {
 } from "@/components/ui/carousel"
 import ElectricBorder from './components/ElectricBorder';
 import StarBorder from './components/StarBorder';
-
-const items = ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', 'Item 9', 'Item 10', 'Item 11', 'Item 12', 'Item 13', 'Item 14', 'Item 15', 'Item 16', 'Item 17', 'Item 18', 'Item 19', 'Item 20']; 
- 
+import SimpleCanvas from './components/RaceTrack';
 
 interface Obstacle {
   id: number;
@@ -32,6 +29,79 @@ function App() {
   const [isDraggingFromToolbar, setIsDraggingFromToolbar] = useState(false);
   const [isStopwatchRunning, setIsStopwatchRunning] = useState(false);
   const [stopwatchReset, setStopwatchReset] = useState(false);
+  const socketRef = useRef(<WebSocket | null>(null);
+
+  // ============================================
+  // WebSocket State for Live Data
+  // ============================================
+  const [agents, setAgents] = useState<any[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // ============================================
+  // WebSocket Connection
+  // ============================================
+  useEffect(() => {
+    // 🔧 CHANGE THIS URL TO MATCH YOUR BACKEND!
+    const WEBSOCKET_URL = 'ws://localhost:8000/ws';
+    
+    console.log('🔌 Connecting to WebSocket:', WEBSOCKET_URL);
+    socketRef.current = new WebSocket(WEBSOCKET_URL);
+    
+    socketRef.onopen = () => {
+      console.log('✅ WebSocket Connected!');
+      setIsConnected(true);
+    };
+    
+    socketRef.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.agents && Array.isArray(data.agents)) {
+          console.log('📦 Received agents:', data.agents.length, 'agents');
+          setAgents(data.agents);
+        }
+      } catch (error) {
+        console.error('❌ Error parsing WebSocket data:', error);
+      }
+    };
+    
+    socketRef.onerror = (error) => {
+      console.error('❌ WebSocket Error. Check:');
+      console.log('   1. Is backend running?');
+      console.log('   2. Is URL correct?', WEBSOCKET_URL);
+      setIsConnected(false);
+    };
+    
+    socketRef.onclose = () => {
+      console.log('🔴 WebSocket Disconnected');
+      setIsConnected(false);
+    };
+    
+    return () => {
+      socketRef.close();
+    };
+  }, []);
+
+  // ============================================
+  // Sort and Format Agents for Leaderboard
+  // ============================================
+  const sortedAgents = [...agents]
+    .filter(agent => agent.state === 'running' || agent.state === 'crashed')
+    .sort((a, b) => {
+      if (b.laps !== a.laps) {
+        return (b.laps || 0) - (a.laps || 0);
+      }
+      return (b.speed || 0) - (a.speed || 0);
+    });
+
+  // Format items for AnimatedList (leaderboard)
+  const items = sortedAgents.map((agent, index) => {
+    const position = index + 1;
+    const medal = position === 1 ? '🥇' : position === 2 ? '🥈' : position === 3 ? '🥉' : `${position}.`;
+    const crashIcon = agent.state === 'crashed' ? '💥' : '';
+    
+    return `${medal} ${agent.id} | Lap: ${agent.laps || 0} | Speed: ${(agent.speed || 0).toFixed(1)} | Fuel: ${(agent.fuel || 0).toFixed(0)}% ${crashIcon}`.trim();
+  });
 
   const handleObstaclesChange = (newObstacles: Obstacle[]) => {
     setObstacles(newObstacles);
@@ -84,65 +154,79 @@ function App() {
             reset={stopwatchReset}
             onResetComplete={handleResetComplete}
           />
-          <RaceTrack
-            width={1400}
-            height={750}
-            trackType="stadium"
-            obstacles={obstacles}
-            onObstaclesChange={handleObstaclesChange}
-            isDraggingFromToolbar={isDraggingFromToolbar}
-          />
+          <div>
+            <SimpleCanvas />
+          </div>
         </div>
         
         <div className="cards-section">
           
-            <div className="carousel-wrapper">
+          <div className="carousel-wrapper">
             <Carousel className="w-[400px] ml-2">
               <CarouselContent>
-                <CarouselItem>
-                  <div className="p-8 bg-[#111] rounded-lg border border-neutral-800 h-64 flex items-center justify-center m-2">
-                    <p className="text-white">Carousel Item 1</p>
-                  </div>
-                </CarouselItem>
-                <CarouselItem>
-                  <div className="p-8 bg-[#111] rounded-lg border border-neutral-800 h-64 flex items-center justify-center m-2">
-                    <p className="text-white">Carousel Item 2</p>
-                  </div>
-                </CarouselItem>
-                <CarouselItem>
-                  <div className="p-8 bg-[#111] rounded-lg border border-neutral-800 h-64 flex items-center justify-center m-2">
-                    <p className="text-white">Carousel Item 3</p>
-                  </div>
-                </CarouselItem>
+                {/* CHANGED: Now showing live agent data */}
+                {sortedAgents.length === 0 ? (
+                  // Show placeholder when no agents
+                  <CarouselItem>
+                    <div className="p-8 bg-[#111] rounded-lg border border-neutral-800 h-64 flex items-center justify-center m-2">
+                      <p className="text-white">
+                        {isConnected ? 'Waiting for agents...' : '🔴 Not connected to backend'}
+                      </p>
+                    </div>
+                  </CarouselItem>
+                ) : (
+                  // Show each agent in a carousel card
+                  sortedAgents.slice(0, 10).map((agent, index) => (
+                    <CarouselItem key={agent.id}>
+                      <div className="p-8 bg-[#111] rounded-lg border border-neutral-800 h-64 flex flex-col items-center justify-center m-2">
+                        {/* Position Badge */}
+                        <div className="text-4xl mb-3">
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`}
+                        </div>
+                        
+                        {/* Agent Info */}
+                        <p className="text-white text-center">
+                          <span className="text-2xl font-bold block mb-2">{agent.id}</span>
+                          <span className="block">Lap: <strong>{agent.laps || 0}</strong></span>
+                          <span className="block">Speed: <strong>{(agent.speed || 0).toFixed(1)} km/h</strong></span>
+                          <span className="block">Fuel: <strong>{(agent.fuel || 0).toFixed(0)}%</strong></span>
+                          
+                          {/* Status */}
+                          {agent.state === 'crashed' && (
+                            <span className="block mt-2 text-red-500 font-bold">💥 CRASHED</span>
+                          )}
+                          {agent.state === 'running' && (
+                            <span className="block mt-2 text-green-500 font-bold">✅ RACING</span>
+                          )}
+                        </p>
+                      </div>
+                    </CarouselItem>
+                  ))
+                )}
               </CarouselContent>
               <CarouselPrevious />
               <CarouselNext />
             </Carousel>
-            </div>
-          
-          
+          </div>
           
           <div className="spotlight-cards-container">
             
-              <SpotlightCard className="ml-10 custom-spotlight-card w-[250px] h-64" spotlightColor="rgba(0, 229, 255, 0.2)">
-                <div className="flex flex-col items-center justify-center h-full gap-4">
-                  <h2 className="text-2xl font-bold text-white mb-2">OBSTACLES</h2>
-                  
-                  <ObstacleToolbar 
-                    onDragStart={() => setIsDraggingFromToolbar(true)}
-                  />
-                  
-                  <div className="control-buttons">
-                    <button className="control-btn stop-btn" onClick={handleStop}></button>
-                    <button className="control-btn play-btn" onClick={handlePlay}></button>
-                    <button className="control-btn pause-btn" onClick={handlePause}></button>
-                  </div>
+            <SpotlightCard className="ml-10 custom-spotlight-card w-[250px] h-64" spotlightColor="rgba(0, 229, 255, 0.2)">
+              <div className="flex flex-col items-center justify-center h-full gap-4">
+                <h2 className="text-2xl font-bold text-white mb-2">OBSTACLES</h2>
+                
+                <ObstacleToolbar 
+                  onDragStart={() => setIsDraggingFromToolbar(true)}
+                />
+                
+                <div className="control-buttons">
+                  <button className="control-btn stop-btn" onClick={handleStop}></button>
+                  <button className="control-btn play-btn" onClick={handlePlay}></button>
+                  <button className="control-btn pause-btn" onClick={handlePause}></button>
                 </div>
-              </SpotlightCard>
+              </div>
+            </SpotlightCard>
 
-            
-
-            
             <SpotlightCard className="ml-10 custom-spotlight-card w-[250px] h-64" spotlightColor="rgba(0, 229, 255, 0.2)">
               <div className="flex flex-col items-center justify-center h-full gap-4">
                 <h2 className="text-2xl font-bold text-white mb-2">OBSTACLES</h2>
@@ -173,17 +257,29 @@ function App() {
           <div className="adjacent-cards-container">
           </div>
         </div>
-
-        
-
       </div>
       
-
       <div className="right-section">
+        {/* Connection Status */}
+        <div style={{
+          padding: '8px',
+          marginBottom: '10px',
+          background: isConnected ? '#28a745' : '#dc3545',
+          color: 'white',
+          borderRadius: '8px',
+          textAlign: 'center',
+          fontWeight: 'bold',
+          fontSize: '12px'
+        }}>
+          {isConnected ? `🟢 LIVE - ${agents.length} agents` : '🔴 DISCONNECTED'}
+        </div>
+
         <h1 className="leaderboard-heading">Leaderboard</h1>
+        
+        {/* AnimatedList Leaderboard */}
         <AnimatedList
           items={items}
-          onItemSelect={(item: string, index: number) => console.log(item, index)}
+          onItemSelect={(item: string, index: number) => console.log('Selected:', item, 'Position:', index + 1)}
           showGradients={true}
           enableArrowNavigation={true}
           displayScrollbar={false}

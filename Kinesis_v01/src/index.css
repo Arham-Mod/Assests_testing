@@ -7,6 +7,6 @@
 body {
   margin: 0;
   font-family: poppins, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background: linear-gradient(-135deg, #000000 0%, #000000 25%, #000000 50%, #2b0000 75%, #450404 100%);
+  background: linear-gradient(-135deg, #000000 0%, #000000 25%, #000000 50%, #580a0a 75%, #a80606 100%);
   min-height: 100vh;
 }
