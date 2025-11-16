@@ -6,6 +6,7 @@
 /* Your custom styles here */
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background-color: #000000;
+  font-family: poppins, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background: linear-gradient(-135deg, #000000 0%, #000000 25%, #000000 50%, #2b0000 75%, #450404 100%);
+  min-height: 100vh;
 }

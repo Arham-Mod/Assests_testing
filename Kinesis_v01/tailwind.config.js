@@ -5,7 +5,13 @@ module.exports = {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        'geist-mono': ['Geist Mono', 'monospace'],
+        'racing-sans': ['Racing Sans One', 'cursive'],
+        sans: ['Racing Sans One', 'cursive'],
+      },
+    },
   },
   plugins: [],
 };

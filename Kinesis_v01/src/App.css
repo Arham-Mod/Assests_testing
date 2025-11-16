@@ -16,24 +16,68 @@
 
 .canvas-container {
   flex-shrink: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.stopwatch {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  background-color: rgba(0, 0, 0, 0.7);
+  padding: 12px 20px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.stopwatch-time {
+  font-family: 'Racing Sans One', cursive;
+  font-size: 2rem;
+  color: #ffffff;
+  font-weight: 400;
+  letter-spacing: 2px;
 }
 
 .right-section {
   padding-left: 10px;
   display: flex;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   position: relative;
   overflow-y: auto;
+}
+
+.leaderboard-heading {
+  font-family: 'Racing Sans One', cursive;
+  font-size: 2rem;
+  font-weight: 400;
+  color: white;
+  margin-bottom: 20px;
+  text-align: center;
+  width: 100%;
 }
 
 .cards-section {
   display: flex;
   flex-direction: row;
   gap: 30px;
-  align-items: flex-start;
+  align-items: stretch;
   flex-wrap: wrap;
-  padding-top: 20px;
+  padding: 20px 30px;
   min-height: 300px;
+  justify-content: flex-start;
+}
+
+.spotlight-cards-container {
+  display: flex;
+  flex-direction: row;
+  gap: 50px;
+  align-items: stretch;
+  margin-left: auto;
 }
 
 .adjacent-cards-container {
@@ -43,4 +87,114 @@
   flex-wrap: wrap;
   flex: 1;
   min-width: 250px;
+}
+
+.carousel-wrapper {
+  position: relative;
+  flex-shrink: 0;
+  height: 256px;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+
+/* Carousel button styling */
+.carousel-wrapper button {
+  background-color: rgba(255, 255, 255, 0.9) !important;
+  border: 2px solid rgba(255, 255, 255, 0.5) !important;
+  color: #000000 !important;
+  z-index: 20;
+}
+
+.carousel-wrapper button:hover {
+  background-color: rgba(255, 255, 255, 1) !important;
+  border-color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.carousel-wrapper button:disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed;
+}
+
+.carousel-wrapper button svg {
+  color: #000000 !important;
+}
+
+.custom-spotlight-card {
+  padding: 10px;
+}
+
+.control-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.control-btn {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.control-btn:hover {
+  opacity: 0.8;
+}
+
+.control-btn:active {
+  opacity: 0.6;
+}
+
+.play-btn {
+  width: 0;
+  height: 0;
+  background-color: transparent;
+  border-left: 20px solid #22c55e;
+  border-top: 12px solid transparent;
+  border-bottom: 12px solid transparent;
+  border-right: none;
+  padding: 0;
+  border-radius: 0;
+}
+
+.pause-btn {
+  width: 40px;
+  height: 40px;
+  background-color: #eab308;
+  position: relative;
+  padding: 0;
+}
+
+.pause-btn::before,
+.pause-btn::after {
+  content: '';
+  position: absolute;
+  background-color: white;
+  width: 6px;
+  height: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pause-btn::before {
+  left: 12px;
+}
+
+.pause-btn::after {
+  right: 12px;
+}
+
+.stop-btn {
+  width: 40px;
+  height: 40px;
+  background-color: #ad0707;
+  padding: 0;
+  border-radius: 0 !important;
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
 }

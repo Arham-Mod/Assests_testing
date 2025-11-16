@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import drawTrackSmoothed from './Track.jsx';
 
 interface Obstacle {
   id: number;
@@ -351,46 +352,56 @@ const RaceTrack: React.FC<RaceTrackProps> = ({
   };
 
   // Render loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Render loop
+useEffect(() => {
+  const canvas = canvasRef.current;
+  if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
+  // Clear canvas first
+  ctx.clearRect(0, 0, width, height);
 
-    const config = trackConfigs[trackType];
+  // Save state before any transforms
+  ctx.save();
 
-    if (config.type === 'ellipse') {
-      drawOvalTrack(ctx, config);
-    } else if (config.type === 'stadium') {
-      drawStadiumTrack(ctx, config);
-    } else if (config.type === 'path') {
-      drawCircuitTrack(ctx, config);
+  // Move origin to CENTER of canvas
+  ctx.translate(width / 2, height / 2);
+
+  // Now (0, 0) is at center, but we need to offset the track
+  // so it stays in the same visual position
+  
+  // Draw track (it's already positioned for top-left origin)
+  // So we need to shift it back by half canvas dimensions
+  ctx.save();
+  ctx.translate(-width / 2, -height / 2);
+  drawTrackSmoothed(ctx);
+  ctx.restore();
+
+  // Draw obstacles (these use centered coordinates)
+  drawObstacles(ctx);
+
+  // Restore transform for UI elements
+  ctx.restore();
+
+  // Draw coordinate display (in screen coordinates)
+  ctx.fillStyle = '#00ff00';
+  ctx.font = '12px monospace';
+  ctx.fillText(`Mouse: (${Math.round(mousePos.x)}, ${Math.round(mousePos.y)})`, 10, 20);
+
+  if (selectedObstacle) {
+    const obs = obstacles.find(o => o.id === selectedObstacle);
+    if (obs) {
+      ctx.fillText(
+        `Selected: x=${Math.round(obs.x)}, y=${Math.round(obs.y)}, angle=${(obs.angle * 180 / Math.PI).toFixed(1)}°, length=${obs.length}`,
+        10,
+        40
+      );
     }
+  }
 
-    drawObstacles(ctx);
-
-    // Draw coordinate display
-    ctx.restore();
-    ctx.fillStyle = '#00ff00';
-    ctx.font = '12px monospace';
-    ctx.fillText(`Mouse: (${Math.round(mousePos.x)}, ${Math.round(mousePos.y)})`, 10, 20);
-
-    if (selectedObstacle) {
-      const obs = obstacles.find(o => o.id === selectedObstacle);
-      if (obs) {
-        ctx.fillText(
-          `Selected: x=${Math.round(obs.x)}, y=${Math.round(obs.y)}, angle=${(obs.angle * 180 / Math.PI).toFixed(1)}°, length=${obs.length}`,
-          10,
-          40
-        );
-      }
-    }
-
-  }, [trackType, width, height, obstacles, selectedObstacle, mousePos]);
+}, [trackType, width, height, obstacles, selectedObstacle, mousePos]);
 
   return (
     <canvas
